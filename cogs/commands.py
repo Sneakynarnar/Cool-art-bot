@@ -15,8 +15,10 @@ ruleChoices = [create_choice(name="Rule 1", value=1), create_choice(name="Rule 2
 censorChoices = [create_choice(value=1, name="Spoiler"), create_choice(value=2, name="Banned"), create_choice(value=3, name="Allow")]
 MODS = [339866237922181121,479691334332973066,819466383175712780,374219910433210368]
 guild_id=[826814545099358238]
+host = "localhost"
+
 con = mysql.connector.connect(
-    host="localhost",
+    host=host,
     user="sneaky",
     passwd="Dominus7206!",
     database="coolart"
@@ -235,16 +237,19 @@ class commands(commands.Cog):
 
     @commands.Cog.listener()
     async def on_component(self, ctx: ComponentContext):
+        guild = self.bot.get_guild(guild_id[0])
         if ctx.custom_id.startswith("accept"):
             await ctx.defer(edit_origin=True)
             msgId = int(ctx.custom_id[6:])
             print(msgId)
+            
             cur.execute("SELECT memberId FROM applications WHERE appMessageId = %s",(msgId,))
             memberId = cur.fetchone()
             if memberId is None:
                 return
             memberId = memberId[0]
-            user = self.bot.get_user(memberId)
+            print(memberId)
+            user = guild.get_member(memberId)
             await user.dm_channel.send("Good news! We liked your application and would like to talk to you more about being a mod! A staff member should DM you")
             cur.execute("DELETE FROM applications WHERE appMessageId = %s",(msgId,))
             await ctx.edit_origin(content=f"Accepted for interview by {ctx.author.mention}!", components=None)
@@ -260,10 +265,10 @@ class commands(commands.Cog):
             if memberId is None:
                 return
             memberId = memberId[0]
-            user = self.bot.get_user(memberId)
-            await ctx.edit_origin(content=f"Declined by {ctx.author.mention}!", components=None)
+            user = guild.get_member(memberId)
             await user.dm_channel.send("We appreciate you wanting to help out in the server! But we have decided are not what we are looking for in a mod right now, thank you for applying.\n\nSincerely - The Mod Team :)")
             cur.execute("DELETE FROM applications WHERE appMessageId = %s",(msgId,))
+            await ctx.edit_origin(content=f"Declined by {ctx.author.mention}!", components=None)
             con.commit()
           
     @commands.command(name ="status", hidden = True)
@@ -287,5 +292,6 @@ class commands(commands.Cog):
         await self.bot.change_presence(activity=activity)
         await ctx.channel.send('Status changed to "{0} {1}"'.format(act, thing))
 
+            
 def setup(bot):
     bot.add_cog(commands(bot))

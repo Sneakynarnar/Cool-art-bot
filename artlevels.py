@@ -21,7 +21,6 @@ import discord.ext
 import random
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageColor
 import io
-import mysql.connector
 import re
 from discord.ext import commands
 from discord_slash.utils.manage_commands import create_choice, create_option, create_permission, create_multi_ids_permission
@@ -36,17 +35,15 @@ guild_id = [826814545099358238]
 POST_EXP_LOWER  = 50
 POST_EXP_UPPER = 100
 UPVOTE_EXP_AMOUNT = 50
-host = "localhost"
-#host = "45.77.229.75"
-con = mysql.connector.connect(
-    host=host,
-    user="sneaky",
-    passwd="Dominus7206!",
-    database="coolart"
-)
-
-cur = con.cursor(buffered=True)
-
+con = sqlite3.connect("resources/Databases/database.db")
+con.isolation_level = None
+#con = sqlite3.connect(":memory:")
+cur = con.cursor()
+#cur.execute("CREATE TABLE gallery (messageId integer PRIMARY_KEY, memberId integer, upvotes integer)")
+#cur.execute("CREATE TABLE artLevels (member integer, exp integer, artAmount integer, rank integer)")
+#cur.execute("CREATE TABLE upvotes (memberId, postMessageId)")
+#cur.execute("CREATE TABLE upvotesExp (memberId, postMessageId)")
+#cur.execute("CREATE TABLE upvotees (memberId, postMessageId)")
 class artlevels(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -59,7 +56,7 @@ class artlevels(commands.Cog):
     def generateCode(self):
         while True: 
             refCode = random.randint(100000, 999999)
-            cur.execute("SELECT * FROM refferals WHERE refferalCode = %s", (refCode,))
+            cur.execute("SELECT * FROM refferals WHERE refferalCode = ?", (refCode,))
 
             if cur.fetchone() is None:
                 return refCode
@@ -84,7 +81,7 @@ class artlevels(commands.Cog):
     #     code = cur.fetchone()
     #     if code is None:
     #         code = self.generateCode()
-    #         cur.execute("INSERT INTO refferals VALUES (%s,%s)", (ctx.author.id, code))
+    #         cur.execute("INSERT INTO refferals VALUES (?,?)", (ctx.author.id, code))
     #     else:
     #         code = code[0]
     #     embed = discord.Embed(description=f"Your refferal code is **{code}**! Get your friend to enter this code when they join then you and them will recieve a **24 HOUR 2X EXP BOOSTER**!")
@@ -98,7 +95,7 @@ class artlevels(commands.Cog):
 
     @cog_ext.cog_slash(name="exp", default_permission=False,guild_ids=guild_id, description="Give exp", options=[create_option(name="member", description="Member to give exp to", option_type=6, required=True), 
     create_option(name="amount", description="amount to give", option_type=4, required=True)],
-    permissions= {826814545099358238: [create_permission(826867333192220702, SlashCommandPermissionType.ROLE, True)]})
+    permissions= {826814545099358238: create_multi_ids_permission(ids=MODS, id_type = SlashCommandPermissionType.USER, permission=True)})
     async def expCommand(self, ctx: discord_slash.SlashContext, member, amount):
         if amount > 0:
             exp = await self.addExp(member, amount)
@@ -110,60 +107,21 @@ class artlevels(commands.Cog):
             await ctx.send("Cannot add exp below 0")
             
 
-    @cog_ext.cog_slash(name="leaderboard", guild_ids=guild_id, description="Shows top 10 on the exp leaderboards")
-    async def leaderboardCommand(self, ctx: discord_slash.SlashContext):
-        def calculateTotalExp(rank, exp):
-            if rank == 0:
-                return exp
-            else:
-                return int( ((rank+1)/2) * ((2*1000 + (rank*500))) ) +exp
-        cur.execute("SELECT * FROM artLevels")
 
-        records = cur.fetchall()
-        def takeTotalExp(elem):
-            exp = calculateTotalExp(elem[3], elem[1])
-            return exp
-
-        embed = discord.Embed(title="Exp leaderboard")
-        counter=1
-        for record in sorted(records, key=takeTotalExp, reverse=True):
-            member = self.bot.get_user(record[0])
-            if counter == 1:
-                place = ":first_place:"
-            elif counter == 2:
-                place = ":second_place:"
-            elif counter == 3:
-                place = ":third_place:"
-            elif counter == 11:
-                break
-            else:
-                place= "#" + str(counter)
-            rank = record[3]
-            threashold = 1000 + rank*500
-            exp = record[1]
-            roleId = ranks[rank][1]
-            role = ctx.guild.get_role(ranks[rank][1])
-            total = calculateTotalExp(rank, exp)
-            mention = member.mention if member is not None else "Deleted user"
-            name = member.name if member is not None else "Deleted user"
-            embed.add_field(name=f"{place} {name}", value=f"{mention}, Rank: {role.mention}\nExp`{exp}/{threashold}`\n", inline=False)
-            counter+=1
-        
-        await ctx.send(embed=embed)
 
     @cog_ext.cog_slash(name="rank", guild_ids=guild_id, description="Shows someones rank", options=[create_option(name="member", description="Member to display rank of", option_type=6, required=False)])
     async def rankCommand(self, ctx: discord_slash.SlashContext, member=None):
         if member is None:
             member = ctx.author
 
-        cur.execute("SELECT * FROM artLevels WHERE member = %s", (member.id,))
+        cur.execute("SELECT * FROM artLevels WHERE member = ?", (member.id,))
         record = cur.fetchone()
         if record is None:
-            cur.execute("INSERT INTO artLevels VALUES (%s,%s,%s,%s)", (member.id,0,0,0)) # member, exp, artAmount, rank
+            cur.execute("INSERT INTO artLevels VALUES (?,?,?,?)", (member.id,0,0,0)) # member, exp, artAmount, rank
             record = (member.id,0,0,0)  
         buffer = await self.getRankImage(member, record[1], record[3], ctx.guild)
         await ctx.send(file=discord.File(buffer, "rank.png"))           
-        con.commit()
+    
     cur.execute("SELECT * FROM artLevels")
     @commands.Cog.listener()
     async def on_message(self, msg):
@@ -258,8 +216,8 @@ class artlevels(commands.Cog):
             actionrow = create_actionrow(create_button(style=ButtonStyle.green, label="Verify!", custom_id=f"verify{message.id}"),create_button(style=ButtonStyle.red, label="Remove", custom_id=f"remove{message.id}"))
             await controlRoom.send(content="Content for verification:",embed=embed, components=[actionrow])
 
-            cur.execute("INSERT INTO gallery VALUES (%s,%s,0)", (message.id, artist.id))
-            con.commit()
+            cur.execute("INSERT INTO gallery VALUES (?,?,0)", (message.id, artist.id))
+
             await msg.delete()
             await artist.create_dm()
             await artist.dm_channel.send("Do you want to add any tags? If you do type them separated with commas\n\nExample: pro, digital, awesome ")
@@ -292,12 +250,12 @@ class artlevels(commands.Cog):
             await artist.dm_channel.send("Tags added!")
             
 
-    
+
     @commands.Cog.listener()
     async def on_component(self, ctx: ComponentContext):
         if ctx.custom_id.startswith("verify"):
             msgId = int(ctx.custom_id[6:])
-            cur.execute("SELECT memberId FROM gallery WHERE messageId = %s", (msgId,))
+            cur.execute("SELECT memberId FROM gallery WHERE messageId = ?", (msgId,))
             record = cur.fetchone()
             artist = ctx.guild.get_member(record[0])
             exp = random.randint(POST_EXP_LOWER, POST_EXP_UPPER)
@@ -307,7 +265,7 @@ class artlevels(commands.Cog):
             message = await galleryChannel.fetch_message(msgId)
             embed = message.embeds[0]
             embed.set_footer(text=f"Uploaded by {artist.name}", icon_url=artist.avatar_url)
-            if len(embed.fields) <2:
+            if embed.fields <2:
                 embed.insert_field_at(1, name="Upvotes", value="This post has **0** upvotes")
                 await message.edit(embed=embed, components=[actionrow])
                 await ctx.edit_origin(content=f"Accepted by {ctx.author.mention}!", components=None)
@@ -315,28 +273,30 @@ class artlevels(commands.Cog):
                 await message.edit(embed=embed, components=[actionrow])
         elif ctx.custom_id.startswith("upvote"):
             msgId = int(ctx.custom_id[6:])
-            cur.execute("SELECT memberId, upvotes FROM gallery WHERE messageId = %s", (msgId,))
+            cur.execute("SELECT memberId, upvotes FROM gallery WHERE messageId = ?", (msgId,))
             record = cur.fetchone()
             artist = ctx.guild.get_member(record[0])
             upvotes = record[1]
             if artist == ctx.author:
                 await ctx.send(hidden=True, content="We love your pride in your art, however, you cannot upvote your own post.")
                 return
-            cur.execute("SELECT * FROM upvotesExp WHERE memberId = %s AND postMessageId= %s", (ctx.author.id, msgId))
+            cur.execute("SELECT * FROM upvotesExp WHERE memberId = ? AND postMessageId= ?", (ctx.author.id, msgId))
             record = cur.fetchone()
             if record is None:
-                cur.execute("INSERT INTO upvotesExp VALUES (%s,%s)",(ctx.author.id, msgId))
+                cur.execute("INSERT INTO upvotesExp VALUES (?,?)",(ctx.author.id, msgId))
                 await self.addExp(member=artist, amount=UPVOTE_EXP_AMOUNT)
-            cur.execute("SELECT * FROM upvotes WHERE memberId = %s AND postMessageId= %s", (ctx.author.id, msgId))
+            cur.execute("SELECT * FROM upvotes WHERE memberId = ? AND postMessageId= ?", (ctx.author.id, msgId))
             record = cur.fetchone()
-            #cur.execute("SELECT * FROM upvotes WHERE memberId = %s AND postMessageId= %s", (ctx.author.id, msgId))
+            #cur.execute("SELECT * FROM upvotes WHERE memberId = ? AND postMessageId= ?", (ctx.author.id, msgId))
             if record is None:
-                cur.execute("INSERT INTO upvotes VALUES (%s,%s)", (ctx.author.id, msgId))
+                cur.execute("INSERT INTO upvotes VALUES (?,?)", (ctx.author.id, msgId))
                 upvotes+=1
                 
             else:
-                cur.execute("DELETE FROM upvotes WHERE memberId = %s AND postMessageId = %s", (ctx.author.id, msgId))
+                cur.execute("DELETE FROM upvotes WHERE memberId = ? AND postMessageId = ?", (ctx.author.id, msgId))
                 upvotes -=1
+
+
 
             galleryChannel = ctx.guild.get_channel(self.galleryChannel)
             message = await galleryChannel.fetch_message(msgId)
@@ -348,32 +308,30 @@ class artlevels(commands.Cog):
             else:
                 embed.add_field(name="Upvotes", value=upstring)
             await message.edit(embed=embed)
-            cur.execute("UPDATE gallery SET upvotes = %s WHERE messageId = %s", (upvotes, msgId))
-
+            cur.execute("UPDATE gallery SET upvotes = ? WHERE messageId = ?", (upvotes, msgId))
+            con.commit()
             if record is None:
                 await ctx.send(hidden=True, content="Upvote added!")
             else:
                 await ctx.send(hidden=True, content="Upvote removed!")
 
         elif ctx.custom_id.startswith("remove"):
-            
             msgId = int(ctx.custom_id[6:])
-            cur.execute("DELETE FROM gallery WHERE messageId = %s", (msgId,))
+            cur.execute("DELETE FROM gallery WHERE messageId = ?", (msgId,))
             galleryChannel = ctx.guild.get_channel(self.galleryChannel)
             message = await galleryChannel.fetch_message(msgId)
             await message.delete()
             await ctx.edit_origin(content=f"Removed by {ctx.author.mention}", components=None)
-
-
+        
         con.commit()
-    async def addExp(self, member, amount): 
+    async def addExp(self, member, amount):
         
         guild = self.bot.get_guild(guild_id[0])
         cur.execute(f"SELECT * FROM artLevels WHERE member = {member.id}")
         record = cur.fetchone()
         
         if record is None:
-            cur.execute("INSERT INTO artLevels VALUES (%s,%s,%s,%s)", (member.id,0,0,0)) # member, exp, artAmount, rank
+            cur.execute("INSERT INTO artLevels VALUES (?,?,?,?)", (member.id,0,0,0)) # member, exp, artAmount, rank
             record = (member.id,0,0,0)    
         member = id = record[0]
         exp = record[1] + amount

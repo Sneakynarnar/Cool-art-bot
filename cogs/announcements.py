@@ -68,7 +68,7 @@ class announcements(commands.Cog):
                                                            create_option(name="mentions", description="Mentions will be before the embed", required=False, option_type=3,),
                                                            create_option(name="includeservericon", description="This will include the server picture", required=False, option_type=5),
                                                            create_option(name="skipdesc", description="This will skip the description and go straight to adding a field", option_type=5,required=False)
-                                                           ],permissions={826814545099358238: create_multi_ids_permission(ids=MODS, id_type = SlashCommandPermissionType.USER, permission=True)})
+                                                           ],permissions={826814545099358238: [create_permission(826867333192220702, SlashCommandPermissionType.ROLE, True)]})
     async def makeAnnouncements(self, ctx: SlashContext, title, channel: discord.TextChannel, showauthor=None, mentions=None, includeservericon=None, skipdesc=None):
         showauthor = False if showauthor is None else showauthor
         includeservericon = False if includeservericon is None else includeservericon
@@ -176,7 +176,7 @@ class announcements(commands.Cog):
                                                            create_option(name="showauthor", description="Show who sent this announcemnt", required=False,option_type=5,),
                                                            create_option(name="mentions", description="Mentions will be before the embed", required=False, option_type=3,),
                                                            create_option(name="includeservericon", description="This will include the server picture", required=False, option_type=5)
-                                                           ],permissions={826814545099358238: create_multi_ids_permission(ids=MODS, id_type = SlashCommandPermissionType.USER, permission=True)})
+                                                           ],permissions={826814545099358238: [create_permission(826867333192220702, SlashCommandPermissionType.ROLE, True)]})
     async def makeScheduledAnnouncement(self, ctx: SlashContext, time, title, content, channel: discord.TextChannel, showauthor=None, mentions=None, includeservericon=None):
         dateMatch = re.match("(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})", time) # matching to the syntax XX/XX/XXXX XX:XX
         if dateMatch:
@@ -218,7 +218,6 @@ class announcements(commands.Cog):
         
         cur.execute("DELETE FROM announcements WHERE time = %s", (nowstrf,))
         con.commit()
-        con.close()
     @checkForAnnouncement.before_loop
     async def before_check(self):
         await self.bot.wait_until_ready() # Make sure the bot is ready before doing anything

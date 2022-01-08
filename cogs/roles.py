@@ -17,33 +17,39 @@ import mysql.connector
 
 
 
-buttons = [
-create_button(style=ButtonStyle.grey, label="There is a server announcement", custom_id="announcement"), 
-create_button(style=ButtonStyle.grey, label="Details about events!", custom_id="events"), 
+# buttons = [
+# create_button(style=ButtonStyle.grey, label="There is a server announcement", custom_id="announcement"), 
+# create_button(style=ButtonStyle.grey, label="Details about events!", custom_id="events"), 
 
-]
+# ]
 buttons = [create_button(style=ButtonStyle.grey, label="Male", custom_id="male",emoji="♂️"),
 create_button(style=ButtonStyle.grey, label="Female", custom_id="female", emoji="♀️"),
 create_button(style=ButtonStyle.grey, label="Other", custom_id="other",),
-
 ]
 actionrow =create_actionrow(*buttons)
 class Roles(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
     
-    @commands.command(name="sendrolemessage")
+
+
+
+    @commands.command(name="srm")
     async def sendCommand(self, ctx):
+        buttons = [create_button(style=ButtonStyle.grey, label="Male", custom_id="male",emoji="♂️"),
+        create_button(style=ButtonStyle.grey, label="Female", custom_id="female", emoji="♀️"),
+        create_button(style=ButtonStyle.grey, label="Other", custom_id="other",),
+        ]
+        actionrow =create_actionrow(*buttons)
+
         if ctx.author.id == 339866237922181121:
            guild = ctx.guild
            channel = guild.get_channel(827020439980474408)
            message = await channel.fetch_message(909824369478496276)
-           await message.edit(components=[buttons])
+           await message.edit(content="Click your gender! :P",components=[actionrow])
            await ctx.send("Done.")
-            
-
-
-        
+        else:
+            print("blocked.") 
 
     @cog_ext.cog_slash(name="ping", guild_ids=[720323009503690762], description="Pong!")
     async def anotherPingCommand(self, ctx: discord_slash.context):
